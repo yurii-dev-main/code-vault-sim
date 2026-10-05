@@ -46,9 +46,9 @@ export class AudioManager {
     this.masterGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
     this.masterGain.connect(this.compressor);
 
-    // Music bus (clear, warm, comfortably audible at normal headphone volume)
+    // Music bus (gentle, warm ambient background, 20% softer)
     this.musicGain = this.ctx.createGain();
-    this.musicGain.gain.setValueAtTime(0.55, this.ctx.currentTime);
+    this.musicGain.gain.setValueAtTime(0.44, this.ctx.currentTime);
     this.musicGain.connect(this.masterGain);
 
     // SFX bus
@@ -135,7 +135,7 @@ export class AudioManager {
     this.isMusicEnabled = !this.isMusicEnabled;
 
     if (this.musicGain && this.ctx) {
-      const targetGain = this.isMusicEnabled ? 0.55 : 0.0;
+      const targetGain = this.isMusicEnabled ? 0.44 : 0.0;
       this.musicGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.15);
     }
 
