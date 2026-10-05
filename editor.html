@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Редактор даних монет — Reward Jar</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪙</text></svg>" />
+  </head>
+  <body>
+    <div class="editor-wrapper">
+      <!-- Header -->
+      <header class="editor-header">
+        <div class="header-title-box">
+          <h1>🪙 Редактор даних монет</h1>
+          <p>Зручне додавання та керування нагородами для 3D-банки</p>
+        </div>
+        <div class="header-actions">
+          <a href="/" class="btn" draggable="false" title="Повернутися до 3D банки">
+            <span>⬅️ До 3D Банки</span>
+          </a>
+          <button id="btn-save-server" class="btn btn-success" title="Зберегти зміни у coins.json">
+            <span>💾 Зберегти</span>
+          </button>
+          <button id="btn-download-json" class="btn" title="Завантажити coins.json">
+            <span>📥 Завантажити JSON</span>
+          </button>
+          <label class="btn" style="cursor: pointer;" title="Імпортувати свій JSON файл">
+            <span>📤 Імпортувати</span>
+            <input type="file" id="file-upload" accept=".json" style="display: none;" />
+          </label>
+        </div>
+      </header>
+
+      <!-- Stats Ribbon -->
+      <section class="stats-ribbon">
+        <div class="stat-card">
+          <div class="label">Всього монет</div>
+          <div class="val" id="stat-total-coins">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Загальний баланс балів</div>
+          <div class="val" style="color: var(--accent-gold);" id="stat-total-points">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Монет по 1 балу</div>
+          <div class="val" style="color: var(--accent-silver);" id="stat-silver-coins">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Монет по 2 бали</div>
+          <div class="val" style="color: var(--accent-gold);" id="stat-gold-coins">0</div>
+        </div>
+      </section>
+
+      <!-- Input Form -->
+      <section class="form-card">
+        <h2 id="form-title">➕ Додати нову монету</h2>
+        <form id="coin-form">
+          <div class="form-grid">
+            <!-- Хто -->
+            <div class="form-group">
+              <label for="input-student">Хто отримав (Студент / Ім'я)</label>
+              <input
+                type="text"
+                id="input-student"
+                class="form-input"
+                placeholder="Наприклад: Іван Смирнов"
+                required
+              />
+            </div>
+
+            <!-- Номінал (1 або 2 бали) -->
+            <div class="form-group">
+              <label>Номінал монети</label>
+              <div class="value-radio-group">
+                <label class="radio-card">
+                  <input type="radio" name="coin-value" id="val-1" value="1" checked />
+                  <div class="radio-label">🥈 1 бал (Срібло)</div>
+                </label>
+                <label class="radio-card">
+                  <input type="radio" name="coin-value" id="val-2" value="2" />
+                  <div class="radio-label">🪙 2 бали (Золото)</div>
+                </label>
+              </div>
+            </div>
+
+            <!-- За що -->
+            <div class="form-group form-full">
+              <label for="input-task">За що видана монета</label>
+              <input
+                type="text"
+                id="input-task"
+                class="form-input"
+                placeholder="Наприклад: Розв'язання складної олімпіадної задачі або перемога в хакатоні"
+                required
+              />
+            </div>
+
+            <!-- Коли -->
+            <div class="form-group">
+              <label for="input-date">Коли (Дата)</label>
+              <div class="date-row">
+                <input type="date" id="input-date" class="form-input" required />
+                <button type="button" id="btn-today" class="btn" title="Встановити сьогоднішню дату">Сьогодні</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="submit-btn-row">
+            <button type="button" id="btn-cancel-edit" class="btn" style="display: none; margin-right: 10px;">
+              Скасувати
+            </button>
+            <button type="submit" id="btn-submit-form" class="btn btn-primary">
+              Додати монету
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Existing Coins List -->
+      <section class="list-card">
+        <div class="list-toolbar">
+          <h2 style="font-size: 18px;">📋 Список усіх монет</h2>
+          <input
+            type="text"
+            id="search-input"
+            class="form-input search-input"
+            placeholder="🔍 Пошук за ім'ям, завданням або датою..."
+          />
+        </div>
+
+        <div class="coins-table-container">
+          <table class="coins-table">
+            <thead>
+              <tr>
+                <th style="width: 130px;">Номінал</th>
+                <th>Хто</th>
+                <th>За що</th>
+                <th style="width: 120px;">Коли</th>
+                <th style="width: 90px;">Дії</th>
+              </tr>
+            </thead>
+            <tbody id="coins-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script type="module" src="/src/editor.ts"></script>
+  </body>
+</html>
