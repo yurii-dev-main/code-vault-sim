@@ -12,8 +12,8 @@ export class AudioManager {
   private musicGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
 
-  // Music state
-  public isMusicEnabled = true;
+  // Music state: Off by default on start as requested
+  public isMusicEnabled = false;
   public isSfxEnabled = true;
   private musicIntervalId: any = null;
   private currentChordIndex = 0;
@@ -46,28 +46,61 @@ export class AudioManager {
     this.masterGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
     this.masterGain.connect(this.compressor);
 
-    // Music bus (gentle, warm ambient background, 20% softer)
+    // Music bus: Start muted (0.0) since music is off by default
     this.musicGain = this.ctx.createGain();
-    this.musicGain.gain.setValueAtTime(0.44, this.ctx.currentTime);
+    this.musicGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
     this.musicGain.connect(this.masterGain);
 
-    // SFX bus
+    // SFX bus: 0.70 volume for crisp metallic impact responses
     this.sfxGain = this.ctx.createGain();
     this.sfxGain.gain.setValueAtTime(0.70, this.ctx.currentTime);
     this.sfxGain.connect(this.masterGain);
   }
 
+  /**
+   * Robust context helper that ensures context exists and automatically resumes
+   * if the browser suspended it due to tab switching or power saving.
+   */
+  private ensureContext(): boolean {
+    if (!this.ctx) {
+      this.initContext();
+    }
+    if (!this.ctx) return false;
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+    return true;
+  }
+
   private setupUnlockListeners(): void {
-    const unlock = () => {
-      this.unlock();
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('keydown', unlock);
-      window.removeEventListener('touchstart', unlock);
+    const tryResume = () => {
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
     };
 
-    window.addEventListener('pointerdown', unlock, { passive: true });
-    window.addEventListener('keydown', unlock, { passive: true });
-    window.addEventListener('touchstart', unlock, { passive: true });
+    // First user gesture unlock
+    const unlockFirst = () => {
+      this.unlock();
+      window.removeEventListener('pointerdown', unlockFirst);
+      window.removeEventListener('keydown', unlockFirst);
+      window.removeEventListener('touchstart', unlockFirst);
+    };
+
+    window.addEventListener('pointerdown', unlockFirst, { passive: true });
+    window.addEventListener('keydown', unlockFirst, { passive: true });
+    window.addEventListener('touchstart', unlockFirst, { passive: true });
+
+    // Persistent resume listeners so AudioContext automatically recovers after tab switch or sleep
+    window.addEventListener('pointerdown', tryResume, { passive: true });
+    window.addEventListener('touchstart', tryResume, { passive: true });
+    window.addEventListener('keydown', tryResume, { passive: true });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        tryResume();
+      }
+    });
+    window.addEventListener('focus', tryResume);
   }
 
   public unlock(): void {
@@ -91,7 +124,56 @@ export class AudioManager {
   // ==========================================
 
   public startAmbientMusic(): void {
-    if (!this.ctx || this.musicIntervalId) return;
+    if (!this.ensureContext()) return;
+    this.stopAmbientMusic(); // Clear any existing timer to prevent overlaps
+
+    if (this.musicGain && this.ctx) {
+      this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, this.ctx.currentTime);
+      this.musicGain.gain.setTargetAtTime(0.44, this.ctx.currentTime, 0.2);
+    }
+
+    this.playNextBar();
+    this.musicIntervalId = setInterval(() => {
+      this.playNextBar();
+    }, 4800);
+  }
+
+  public stopAmbientMusic(): void {
+    if (this.musicIntervalId) {
+      clearInterval(this.musicIntervalId);
+      this.musicIntervalId = null;
+    }
+    if (this.musicGain && this.ctx) {
+      this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.musicGain.gain.setTargetAtTime(0.0, this.ctx.currentTime, 0.15);
+    }
+  }
+
+  public toggleMusic(): boolean {
+    this.ensureContext();
+    this.isMusicEnabled = !this.isMusicEnabled;
+
+    if (this.isMusicEnabled) {
+      this.startAmbientMusic();
+    } else {
+      this.stopAmbientMusic();
+    }
+
+    return this.isMusicEnabled;
+  }
+
+  public toggleSfx(): boolean {
+    this.ensureContext();
+    this.isSfxEnabled = !this.isSfxEnabled;
+    if (this.sfxGain && this.ctx) {
+      this.sfxGain.gain.setValueAtTime(this.isSfxEnabled ? 0.70 : 0.0, this.ctx.currentTime);
+    }
+    return this.isSfxEnabled;
+  }
+
+  private playNextBar(): void {
+    if (!this.isMusicEnabled || !this.ensureContext() || !this.ctx || !this.musicGain) return;
 
     // Warm, uplifting, rewarding chords:
     // Cmaj9 -> Am9 -> Fmaj7 -> Gsus4
@@ -102,57 +184,17 @@ export class AudioManager {
       [196.00, 261.63, 293.66, 392.00, 440.00]  // G3, C4, D4, G4, A4 (Gsus4/add9)
     ];
 
-    const playNextBar = () => {
-      if (!this.ctx || !this.isMusicEnabled || this.ctx.state !== 'running') return;
+    const chord = chords[this.currentChordIndex];
+    this.currentChordIndex = (this.currentChordIndex + 1) % chords.length;
 
-      const chord = chords[this.currentChordIndex];
-      this.currentChordIndex = (this.currentChordIndex + 1) % chords.length;
+    const barDuration = 4.8; // seconds per chord
+    const now = this.ctx.currentTime;
 
-      const barDuration = 4.8; // seconds per chord
-      const now = this.ctx.currentTime;
+    // 1. Play Warm Pad Chord
+    this.playWarmPad(chord, now, barDuration);
 
-      // 1. Play Warm Pad Chord (clearly audible)
-      this.playWarmPad(chord, now, barDuration);
-
-      // 2. Play Dreamy Bell Plucks throughout the bar
-      this.scheduleBellMelody(chord, now, barDuration);
-    };
-
-    // Play immediately and loop every barDuration
-    playNextBar();
-    this.musicIntervalId = setInterval(playNextBar, 4800);
-  }
-
-  public stopAmbientMusic(): void {
-    if (this.musicIntervalId) {
-      clearInterval(this.musicIntervalId);
-      this.musicIntervalId = null;
-    }
-  }
-
-  public toggleMusic(): boolean {
-    this.unlock();
-    this.isMusicEnabled = !this.isMusicEnabled;
-
-    if (this.musicGain && this.ctx) {
-      const targetGain = this.isMusicEnabled ? 0.44 : 0.0;
-      this.musicGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.15);
-    }
-
-    if (this.isMusicEnabled && !this.musicIntervalId) {
-      this.startAmbientMusic();
-    }
-
-    return this.isMusicEnabled;
-  }
-
-  public toggleSfx(): boolean {
-    this.unlock();
-    this.isSfxEnabled = !this.isSfxEnabled;
-    if (this.sfxGain && this.ctx) {
-      this.sfxGain.gain.setValueAtTime(this.isSfxEnabled ? 0.70 : 0.0, this.ctx.currentTime);
-    }
-    return this.isSfxEnabled;
+    // 2. Play Dreamy Bell Plucks throughout the bar
+    this.scheduleBellMelody(chord, now, barDuration);
   }
 
   private playWarmPad(frequencies: number[], startTime: number, duration: number): void {
@@ -177,7 +219,7 @@ export class AudioManager {
       filter.frequency.exponentialRampToValueAtTime(1150 + idx * 80, startTime + duration * 0.5);
       filter.frequency.exponentialRampToValueAtTime(750 + idx * 90, startTime + duration);
 
-      // Louder, warm envelope (amp ~0.062 per note)
+      // Warm envelope
       const amp = 0.14 / Math.sqrt(frequencies.length);
       noteGain.gain.setValueAtTime(0.0001, startTime);
       noteGain.gain.exponentialRampToValueAtTime(amp, startTime + 0.9);
@@ -240,7 +282,7 @@ export class AudioManager {
    * Played when an interacted coin lands on the floor or the jar after being dropped/thrown
    */
   public playCoinLand(intensity = 1.0): void {
-    if (!this.isSfxEnabled || !this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+    if (!this.isSfxEnabled || !this.ensureContext() || !this.ctx || !this.sfxGain) return;
 
     const now = performance.now();
     if (now - this.lastClinkTime < 60) return;
@@ -276,7 +318,7 @@ export class AudioManager {
 
     // Secondary micro-bounce clink 55ms later to simulate natural settle bounce
     setTimeout(() => {
-      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      if (!this.isSfxEnabled || !this.ensureContext() || !this.ctx || !this.sfxGain) return;
       const tBounce = this.ctx.currentTime;
       const oscBounce = this.ctx.createOscillator();
       const gainBounce = this.ctx.createGain();
@@ -289,7 +331,7 @@ export class AudioManager {
       gainBounce.gain.exponentialRampToValueAtTime(0.0001, tBounce + 0.12);
 
       oscBounce.connect(gainBounce);
-      gainBounce.connect(this.sfxGain);
+      gainBounce.connect(this.sfxGain!);
 
       oscBounce.start(tBounce);
       oscBounce.stop(tBounce + 0.12);
@@ -300,7 +342,7 @@ export class AudioManager {
    * Sound when grabbing a coin (crisp contact ping)
    */
   public playCoinPick(): void {
-    if (!this.isSfxEnabled || !this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+    if (!this.isSfxEnabled || !this.ensureContext() || !this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
@@ -325,7 +367,7 @@ export class AudioManager {
    * Soft whoosh sound when coin is released or thrown
    */
   public playCoinThrow(): void {
-    if (!this.isSfxEnabled || !this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+    if (!this.isSfxEnabled || !this.ensureContext() || !this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
     const bufferSize = Math.floor(this.ctx.sampleRate * 0.18);
@@ -362,7 +404,7 @@ export class AudioManager {
    * Sound of jar lid rotating on glass threads (friction scrape)
    */
   public playLidUnscrew(): void {
-    if (!this.isSfxEnabled || !this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+    if (!this.isSfxEnabled || !this.ensureContext() || !this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
     const duration = 0.75;
@@ -396,7 +438,7 @@ export class AudioManager {
    * Mechanical pop/ring when lid reaches top of thread and flies off
    */
   public playLidPop(): void {
-    if (!this.isSfxEnabled || !this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+    if (!this.isSfxEnabled || !this.ensureContext() || !this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
 
@@ -436,7 +478,7 @@ export class AudioManager {
    * Heavy metallic clatter and bounce when the jar lid lands on the floor
    */
   public playLidHitFloor(): void {
-    if (!this.isSfxEnabled || !this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+    if (!this.isSfxEnabled || !this.ensureContext() || !this.ctx || !this.sfxGain) return;
 
     const t = this.ctx.currentTime;
 
@@ -474,7 +516,7 @@ export class AudioManager {
 
     // 3. Secondary rattle 70ms later as lid settles on the floor
     setTimeout(() => {
-      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      if (!this.isSfxEnabled || !this.ensureContext() || !this.ctx || !this.sfxGain) return;
       const tRat = this.ctx.currentTime;
       const rat = this.ctx.createOscillator();
       const ratGain = this.ctx.createGain();
@@ -486,7 +528,7 @@ export class AudioManager {
       ratGain.gain.exponentialRampToValueAtTime(0.0001, tRat + 0.18);
 
       rat.connect(ratGain);
-      ratGain.connect(this.sfxGain);
+      ratGain.connect(this.sfxGain!);
 
       rat.start(tRat);
       rat.stop(tRat + 0.18);

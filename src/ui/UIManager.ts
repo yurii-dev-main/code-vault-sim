@@ -67,14 +67,14 @@ export class UIManager {
     resetBtn.onclick = () => this.config.onReset();
     actionsGroup.appendChild(resetBtn);
 
-    // Music / Audio toggle button (replaces the public editor button)
+    // Music toggle button (starts muted as music is off by default)
     const audioBtn = document.createElement('button');
-    audioBtn.className = 'glass-btn audio-btn';
+    audioBtn.className = 'glass-btn audio-btn muted';
     audioBtn.id = 'hud-audio-btn';
-    audioBtn.title = 'Музика та звуки (увімкнено)';
+    audioBtn.title = 'Фонова музика вимкнена (натисніть, щоб увімкнути)';
     audioBtn.draggable = false;
     audioBtn.innerHTML = `
-      <span class="audio-icon">🎵</span>
+      <span class="audio-icon">🔇</span>
       <span class="audio-label">Музика</span>
     `;
     audioBtn.onclick = () => {
@@ -84,12 +84,12 @@ export class UIManager {
       if (isMusicOn) {
         if (icon) icon.textContent = '🎵';
         if (label) label.textContent = 'Музика';
-        audioBtn.title = 'Музика та звуки (увімкнено)';
+        audioBtn.title = 'Фонова музика (увімкнено)';
         audioBtn.classList.remove('muted');
       } else {
         if (icon) icon.textContent = '🔇';
-        if (label) label.textContent = 'Без звуку';
-        audioBtn.title = 'Музика вимкнена';
+        if (label) label.textContent = 'Музика';
+        audioBtn.title = 'Фонова музика вимкнена (натисніть, щоб увімкнути)';
         audioBtn.classList.add('muted');
       }
     };
