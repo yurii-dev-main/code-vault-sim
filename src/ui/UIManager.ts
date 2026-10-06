@@ -14,6 +14,7 @@ export class UIManager {
   private countValEl!: HTMLElement;
   private modalEl!: HTMLDivElement;
   private modalContentEl!: HTMLDivElement;
+  private modalOpenTime = 0;
 
   constructor(config: UIConfig) {
     this.config = config;
@@ -147,9 +148,12 @@ export class UIManager {
     this.modalContentEl.className = 'glass-card modal-card';
     this.modalEl.appendChild(this.modalContentEl);
 
-    // Close on backdrop click
+    // Close on backdrop click (with 500ms guard to prevent accidental closure from fast clicks/double-clicks)
     this.modalEl.addEventListener('click', (e) => {
       if (e.target === this.modalEl) {
+        if (performance.now() - this.modalOpenTime < 500) {
+          return;
+        }
         this.closeModal();
       }
     });
@@ -163,6 +167,7 @@ export class UIManager {
   }
 
   public showCoinModal(coin: CoinData): void {
+    this.modalOpenTime = performance.now();
     const isTwo = coin.value === 2;
     const badgeClass = isTwo ? 'badge-gold' : 'badge-silver';
     const badgeText = isTwo ? '🪙 2 бали (Золота монета)' : '🥈 1 бал (Срібна монета)';
