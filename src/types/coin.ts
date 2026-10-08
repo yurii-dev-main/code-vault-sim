@@ -35,5 +35,12 @@ export const DEFAULT_COINS: CoinData[] = [
     student: "Cережа Nikipelov",
     task: "Заняття 4. Функції, обробка помилок (try-except) з Cursor",
     date: "2026-10-01"
+  },
+  {
+    id: "coin-5",
+    value: 2,
+    student: "Богдан Мотеко",
+    task: "Заняття 4. Функції, обробка помилок (try-except) з Cursor",
+    date: "2026-10-08"
   }
 ];
